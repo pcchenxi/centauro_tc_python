@@ -7,7 +7,7 @@ Map_B = 16
 Map_resolution = 0.08
 
 def show_img(img, name, waitkey, use_mask=True):
-    print(name, img.min(), img.max()) 
+    # print(name, img.min(), img.max()) 
 
     img_max = img.max()
     img_min = img.min()
@@ -41,7 +41,7 @@ def filter_cloud_by_minh(cloud):
     point_row_col = []
     point_row_col_small = []
 
-    print(min_img.shape)
+    # print(min_img.shape)
     for p in cloud:
         row = int((p[0]+Map_W/2)/Map_resolution)
         col = int((p[1]+Map_W/2)/Map_resolution)

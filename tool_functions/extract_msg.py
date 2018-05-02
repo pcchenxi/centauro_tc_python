@@ -17,25 +17,26 @@ def extract_msgs(rosbag_name, listener, broadcaster):
     msg_img = []
     msg_kcloud = []
 
+    listener.clear()
     for topic, msg, t in sourse_bag.read_messages():
         if topic == '/tf':
             broadcaster.sendTransformMessage(msg.transforms[0])
         if topic == '/mapping_nodelet/pointcloud' and msg_map == []:
             msg_map = msg 
             msg_ready = True 
-            print('map cloud')
+            # print('map cloud')
         if topic == '/kinect2/qhd/image_color' and msg_img == [] and msg_ready:
             msg_img = msg 
-            print('img')
+            # print('img')
         if topic == '/kinect2/sd/points' and msg_kcloud == [] and msg_ready:
             msg_kcloud = msg
-            print('kcloud')
+            # print('kcloud')
     
-    print('transform set', msg_map.header.frame_id)
+    print('     transform set', msg_map.header.frame_id)
     translation,rotation = listener.lookupTransform('kinect2_rgb_optical_frame', msg_map.header.frame_id, rospy.Time(0))
     trans_to_kinect = listener.fromTranslationRotation(translation, rotation)
 
-    print(trans_to_kinect)
+    # print(trans_to_kinect)
     return msg_map, msg_img, msg_kcloud
 
 def pre_process_cloud(map_cloud_msg, k_ckoud_msg, max_x, max_y, resolution):
@@ -55,7 +56,7 @@ def pre_process_cloud(map_cloud_msg, k_ckoud_msg, max_x, max_y, resolution):
 
     points_list_k = []
     for data in pc2.read_points(k_ckoud_msg, skip_nans=True):
-        if data[2] > 4:
+        if data[2] > 5 or data[2] < 2.5 or abs(data[0]) > 1.5:   #################################
             continue
         points_list_k.append([data[0], data[1], data[2]])
 
@@ -78,7 +79,7 @@ def trans_to_kinect_frame(map_cloud):
     # transform cloud to image frame
     point_image = []
     for p in map_cloud:
-        if p[0] > 0 and p[0] < 4 and abs(p[1])<4 and p[2] < 4:
+        if p[0] > 2.5 and p[0] < 5 and abs(p[1])<1.5 and p[2] < 5:      #######################################
             # print(trans_to_kinect)
             p_k = np.dot(trans_to_kinect, np.array([p[0], p[1], p[2], 1.0]))[:3]
             u, v = get_uv_from_xyz(p_k[0], p_k[1], p_k[2])
@@ -92,7 +93,7 @@ def trans_to_kinect_frame(map_cloud):
     return cloud_rotated
 
 def rotate_map_cloud(map_cloud, kinect_cloud):
-    print('start icp')
+    print('     start icp')
 
     transf = []
     map_trans = trans_to_kinect_frame(map_cloud)
@@ -110,7 +111,7 @@ def rotate_map_cloud(map_cloud, kinect_cloud):
     cloud_rotated = pcl.PointCloud()
     cloud_rotated.from_list(point_rotated)
 
-    print('done icp')
+    print('     done icp')
     return cloud_rotated
 
 

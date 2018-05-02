@@ -44,7 +44,7 @@ def predice_image(img_msg):
     #image = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)    
     image = bridge.imgmsg_to_cv2(img_msg)
     g_kinect_img = image*1
-    print('image shape recieved:', image.shape)
+    print('     image shape recieved:', image.shape)
     # image = bridge.imgmsg_to_cv2(img_msg)
 
     image = sp.misc.imresize(image, image_shape[1:], interp='bilinear')
@@ -69,5 +69,5 @@ def predice_image(img_msg):
     # prediction_label = prediction_label[..., ::-1] # rgb to bgr
     # prediction_publisher.publish(bridge.cv2_to_imgmsg(prediction_label))
 
-    print('CNN feature done')
+    print(' CNN feature done')
     return feature_vision
