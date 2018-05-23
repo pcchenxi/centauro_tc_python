@@ -1,4 +1,4 @@
-import ros, pcl, sys, os
+import ros, pcl, sys, os, math
 import tf as ros_tf
 from sensor_msgs.msg import PointCloud, PointCloud2, PointField
 import sensor_msgs.point_cloud2 as pc2
@@ -8,8 +8,8 @@ from tool_functions.geometric_feature_extractor import *
 from tool_functions.cnn_feature_extractor import *
 from tool_functions.feature_fuser import *
 
-Map_W = 32
-Map_B = 32
+Map_W = 15
+Map_B = 15
 Map_resolution = 0.08
 Map_r = Map_W/Map_resolution
 Map_c = Map_B/Map_resolution
@@ -30,12 +30,12 @@ def publish_msg(msg, frame_id, publisher):
     msg.header.stamp = rospy.Time.now()
     publisher.publish(msg)   
 
-def get_cloud_uv(base_cloud, point_row_col):
+def get_cloud_uv(base_cloud, kinect_cloud, point_row_col):
     # mat44 = get_transform_matrix('kinect2_rgb_optical_frame', cloud_header.frame_id, camera_header.stamp) # get transform matrix
 
     points_in_cam = []
-    uvd_rc = []
-    for p, (row, col)  in zip(base_cloud, point_row_col):
+    uvdh_rc = []
+    for p_base, p, (row, col)  in zip(base_cloud, kinect_cloud, point_row_col):
         if p[2] < 1:
             continue
         u, v = get_uv_from_xyz(p[0], p[1], p[2])
@@ -43,12 +43,13 @@ def get_cloud_uv(base_cloud, point_row_col):
             continue
 
         points_in_cam.append(p)
-        uvd_rc.append([u, v, p[2], row, col])
+        dist = math.sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2])
+        uvdh_rc.append([u, v, dist, p_base[2], row, col])
 
     cloud_in_cam = pcl.PointCloud()
     cloud_in_cam.from_list(points_in_cam)
 
-    return uvd_rc, cloud_in_cam
+    return uvdh_rc, cloud_in_cam
 
 def main(args):
     rospy.init_node('feature_extractor', anonymous=True)
@@ -64,40 +65,48 @@ def main(args):
     listener = ros_tf.TransformListener()
     broadcaster = ros_tf.TransformBroadcaster()
 
-    rosbag_list = os.listdir('/home/xi/data_recorded/testing_data')
+    base_path = '/media/xi/DATA/data_recorded/kth_bags/'
+    rosbag_list = os.listdir(base_path[:-1])
     print(len(rosbag_list))
     # bag_name = '/home/xi/data_recorded/museum/stairs_lappis_6.bag'
 
-    for i in range(len(rosbag_list)):
+    for i in range(0, len(rosbag_list), 1):
         bag_name = rosbag_list[i]
+        if bag_name != 'stairs_lappis_3.bag':
+            continue
         try:
-            found_match = load_loabls('/home/xi/data_recorded/testing_data/'+bag_name)
+            found_match = load_loabls(base_path, base_path+bag_name)
         except:
             continue 
 
         if not found_match:
             continue
 
+        # print(bag_name, i)
+        # continue
+
         print('processing rosbag:', i, bag_name)
 
         # extract messages
-        msg_map, msg_img, msg_kcloud = extract_msgs('/home/xi/data_recorded/testing_data/'+bag_name, listener, broadcaster)
+        msg_map, msg_img, msg_kcloud = extract_msgs(base_path+bag_name, listener, broadcaster)
 
         # cloud preprocessing
         pcl_cloud, kinect_cloud = pre_process_cloud(msg_map, msg_kcloud, Map_W/2, Map_B/2, Map_resolution)
 
-        cloud_kinect = rotate_map_cloud(pcl_cloud, kinect_cloud)
+        cloud_kinect, cloud_icp = rotate_map_cloud(pcl_cloud, kinect_cloud)
+        publish_cloud(cloud_icp, 'kinect2_rgb_optical_frame', pcl_pub)   
+        publish_cloud(kinect_cloud, 'kinect2_rgb_optical_frame', pcl_pub_k)           
         # publish_cloud(cloud_kinect, 'kinect2_rgb_optical_frame', pcl_pub)   
 
-        hdiff_img, slope_img, roughness_img, point_row_col = compute_geometric_features(pcl_cloud, Map_W, Map_B, Map_resolution)
+
+        hdiff_img, slope_img, roughness_img, obs_rgb, point_row_col = compute_geometric_features(pcl_cloud, Map_W, Map_B, Map_resolution)
         feature_vision = predice_image(msg_img)
 
         # get point uv
-        uvd_rc, cloud_in_cam = get_cloud_uv(cloud_kinect, point_row_col)
-        publish_cloud(cloud_in_cam, 'kinect2_rgb_optical_frame', pcl_pub)   
-        publish_msg(msg_kcloud, 'kinect2_rgb_optical_frame', pcl_pub_k)   
+        uvdh_rc, cloud_in_cam = get_cloud_uv(pcl_cloud, cloud_kinect, point_row_col)
+        save_all_features(hdiff_img, slope_img, roughness_img, obs_rgb, uvdh_rc, feature_vision)
 
-        save_all_features(hdiff_img, slope_img, roughness_img, uvd_rc, feature_vision)
+        # cv2.waitKey(0)
 
     print('finish all rosbags')
     rospy.spin()

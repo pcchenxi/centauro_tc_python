@@ -18,10 +18,9 @@ for file_name in feature_file_list:
 print('image loaded:', len(img_path))
 
 
-def load_loabls(rosbag_name):
+def load_loabls(base_path, rosbag_name):
     global img_path, rgb_img, label_img, h_label_img, current_path, current_path_project
 
-    base_path = '/home/xi/data_recorded/testing_data/'
     name = rosbag_name[len(base_path):-4]
     found_match = False
 
@@ -65,22 +64,29 @@ def show_img(img, name, waitkey):
 
     return img
 
-def get_min_distimg(uvd_rc):
+def get_min_distimg(uvdh_rc):
     min_dist_img = np.full((540, 960), 0, np.float32)
-    for (u, v, dist, row, col) in uvd_rc:
+    h_max = -10.0
+    h_min = 100
+    for (u, v, dist, height, row, col) in uvdh_rc:
         u, v = int(u), int(v)
         dist_pre = min_dist_img[v, u]
         if dist_pre == 0 or dist < dist_pre:
             min_dist_img[v, u] = dist
 
-    # show_img(min_dist_img, 'min_dist_img', 0)    
-    return min_dist_img
+        if height > h_max:
+            h_max = height
+        if height < h_min:
+            h_min = height
 
-def save_all_features(hdiff_img, slope_img, roughness_img, uvd_rc, feature_vision):
+    # show_img(min_dist_img, 'min_dist_img', 0)    
+    return min_dist_img, h_min, h_max
+
+def save_all_features(hdiff_img, slope_img, roughness_img, obs_rgb, uvdh_rc, feature_vision):
     global img_path, rgb_img, label_img, h_label_img
     print('save all features')
-    min_dist_img = get_min_distimg(uvd_rc)
-
+    min_dist_img, h_min, h_max = get_min_distimg(uvdh_rc)
+    print(h_max)
 
     cnn_img_size = feature_vision.shape
     features_map = np.full((540, 960, 40), -1.0)
@@ -91,7 +97,7 @@ def save_all_features(hdiff_img, slope_img, roughness_img, uvd_rc, feature_visio
     scale_col = cnn_img_size[2]/float(features_map.shape[1])
 
     # print(scale_row, scale_col, features_map.shape, cnn_img_size)
-    for (u, v, dist, row, col) in uvd_rc:
+    for (u, v, dist, height, row, col) in uvdh_rc:
         u, v, row, col = int(u), int(v), int(row), int(col)
 
         min_dist = min_dist_img[v, u]
@@ -102,8 +108,11 @@ def save_all_features(hdiff_img, slope_img, roughness_img, uvd_rc, feature_visio
         u_cnn = int(u*scale_col)
 
         # test_img[v, u] = label_img[v, u]/50
-        color = int(label_img[v, u])
-        cv2.circle(rgb_img, (u,v), 3, (color, color, color), -1)
+        color = (height-h_min)/h_max * 255  #int(label_img[v, u])
+        narrow = obs_rgb[row, col, 2]
+        if narrow == 255:
+            cv2.circle(rgb_img, (u,v), 2, (0, 0, 255), -1)
+        # cv2.circle(rgb_img, (u,v), 2, (color, color, color), -1)
 
         features_map[v, u, 0] = hdiff_img[row, col]
         features_map[v, u, 1] = slope_img[row, col]
@@ -118,11 +127,15 @@ def save_all_features(hdiff_img, slope_img, roughness_img, uvd_rc, feature_visio
         # print(hd, slope, roughness, stair_feature, len(cnn_features), label/50)
 
     hd_img = features_map[:,:,3]
-    hd_img = show_img(hd_img, 'hd_img', 10)
+    # hd_img = show_img(hd_img, 'hd_img', 10)
     cv2.imshow('mapping', rgb_img)
-    cv2.waitKey(10)
+    cv2.imwrite('./narrow.png', rgb_img)
+    cv2.waitKey(0)
 
     file_name = current_path
-    np.save(file_name, features_map)
-    cv2.imwrite(current_path_project, rgb_img)
+
+    need_save = raw_input('want to save features?')
+    if need_save == 'y':
+        np.save(file_name, features_map)
+        cv2.imwrite(current_path_project, rgb_img)
     # print(file_name)

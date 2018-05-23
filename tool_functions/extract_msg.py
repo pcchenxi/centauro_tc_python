@@ -7,12 +7,15 @@ import sensor_msgs.point_cloud2 as pc2
 from pcl import IterativeClosestPoint, GeneralizedIterativeClosestPoint, IterativeClosestPointNonLinear
 
 trans_to_kinect = []
+path = []
 
 def extract_msgs(rosbag_name, listener, broadcaster):
-    global trans_to_kinect
+    global trans_to_kinect, path
     msg_ready = False
 
     sourse_bag = rosbag.Bag(rosbag_name)
+    path = rosbag_name[:-4]
+
     msg_map = []
     msg_img = []
     msg_kcloud = []
@@ -42,8 +45,8 @@ def extract_msgs(rosbag_name, listener, broadcaster):
 def pre_process_cloud(map_cloud_msg, k_ckoud_msg, max_x, max_y, resolution):
     points_list = []
     for data in pc2.read_points(map_cloud_msg, skip_nans=True):
-        if abs(data[0]) < max_x-resolution and abs(data[1]) < max_y-resolution:
-        # if (data[0]) > 0 and data[0] < 5 and abs(data[1]) < 4-resolution and data[2] < 4:
+        if data[0] > 0 and abs(data[0]) < max_x-resolution and abs(data[1]) < max_y-resolution:
+        # if (data[0]) > 0 and data[0] < max_x-resolution and abs(data[1]) < 10 and data[2] < 5:
             if abs(data[0]) > 0.5 or abs(data[1]) > 0.5:
                 points_list.append([data[0], data[1], data[2]])
 
@@ -51,12 +54,15 @@ def pre_process_cloud(map_cloud_msg, k_ckoud_msg, max_x, max_y, resolution):
     pcl_data.from_list(points_list)
 
     fil = pcl_data.make_ApproximateVoxelGrid()
-    fil.set_leaf_size(resolution, resolution, resolution)
+    fil.set_leaf_size(resolution/3, resolution/3, resolution/3)
     result = fil.filter()
 
     points_list_k = []
     for data in pc2.read_points(k_ckoud_msg, skip_nans=True):
-        if data[2] > 5 or data[2] < 2.5 or abs(data[0]) > 1.5:   #################################
+        u, v = get_uv_from_xyz(data[0], data[1], data[2])
+        if u < 100 or u >= 960 or v < 100 or v >= 540:
+            continue        
+        if data[2] > 10 or abs(data[0]) > 10 or abs(data[1]) > 10:   #################################
             continue
         points_list_k.append([data[0], data[1], data[2]])
 
@@ -79,11 +85,11 @@ def trans_to_kinect_frame(map_cloud):
     # transform cloud to image frame
     point_image = []
     for p in map_cloud:
-        if p[0] > 2.5 and p[0] < 5 and abs(p[1])<1.5 and p[2] < 5:      #######################################
+        if  p[0] < 10 and p[0] > 0 and abs(p[1]) < 10 and abs(p[2]) < 5:      #######################################
             # print(trans_to_kinect)
             p_k = np.dot(trans_to_kinect, np.array([p[0], p[1], p[2], 1.0]))[:3]
             u, v = get_uv_from_xyz(p_k[0], p_k[1], p_k[2])
-            if u < 0 or u >= 960 or v < 0 or v >= 540:
+            if u < 100 or u >= 960 or v < 100 or v >= 540:
                 continue
             point_image.append(p_k)
 
@@ -98,8 +104,11 @@ def rotate_map_cloud(map_cloud, kinect_cloud):
     transf = []
     map_trans = trans_to_kinect_frame(map_cloud)
     
-    icp = map_cloud.make_IterativeClosestPoint()
-    converged, transf, estimate, fitness = icp.icp(map_trans, kinect_cloud, max_iter=1000)
+    # icp = map_cloud.make_GeneralizedIterativeClosestPoint()
+    # converged, transf, estimate, fitness = icp.gicp(map_trans, kinect_cloud, max_iter=1500)
+    # np.save(path+'_trans_icp', transf)    
+
+    transf = np.load(path+'_trans_icp.npy')
 
     point_rotated = []
     for p in map_cloud:
@@ -111,8 +120,16 @@ def rotate_map_cloud(map_cloud, kinect_cloud):
     cloud_rotated = pcl.PointCloud()
     cloud_rotated.from_list(point_rotated)
 
+    point_icp = []
+    for p in map_trans:
+        p_r = np.dot(transf, np.array([p[0], p[1], p[2], 1.0]))[:3]
+        point_icp.append(p_r)
+
+    cloud_icp = pcl.PointCloud()
+    cloud_icp.from_list(point_icp)
+
     print('     done icp')
-    return cloud_rotated
+    return cloud_rotated, cloud_icp
 
 
 # rospy.init_node('msgs_extractor')

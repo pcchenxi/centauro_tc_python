@@ -4,7 +4,7 @@ import numpy as np
 
 Map_W = 16
 Map_B = 16
-Map_resolution = 0.08
+Map_resolution = 0.1
 
 def show_img(img, name, waitkey, use_mask=True):
     # print(name, img.min(), img.max()) 
@@ -22,6 +22,8 @@ def show_img(img, name, waitkey, use_mask=True):
     else:
         cv2.imshow(name, img)
     cv2.waitKey(waitkey)
+
+    cv2.imwrite('./'+name+'.png', img)
     # print(random_image)
     # random_image = random_image.astype(np.uint8)
     # print(img.min(), img.max())    
@@ -49,6 +51,11 @@ def filter_cloud_by_minh(cloud):
         row_small = int((p[0]+Map_W/2)/Map_resolution * scale)
         col_small = int((p[1]+Map_W/2)/Map_resolution * scale)
 
+        if row < 0 or row >= min_img.shape[0] or col < 0 or col >= min_img.shape[1]:
+            continue
+        if row_small < 0 or row_small >= min_img_small.shape[0] or col_small < 0 or col_small >= min_img_small.shape[1]:
+            continue
+            
         point_row_col.append((row, col))
         point_row_col_small.append((row_small, col_small))
 
@@ -163,6 +170,7 @@ def detect_narrow_passage(hdiff_img):
     obs_rgb[:,:,2] = narrow_mask
 
     cv2.imshow('obs_rgb', obs_rgb)
+    cv2.imwrite('./obs_rgb.png', obs_rgb)
     return obs_rgb
 
 def get_slope_roughness_img(cloud_filtered, point_row_col):
@@ -171,7 +179,7 @@ def get_slope_roughness_img(cloud_filtered, point_row_col):
     slope_img = np.full((int(Map_W/Map_resolution), int(Map_B/Map_resolution)), -1, np.float32)
     roughness_img = np.full((int(Map_W/Map_resolution), int(Map_B/Map_resolution)), -1, np.float32)
     normal_big = compute_normal(cloud_filtered, Map_resolution*4)
-    normal_small = compute_normal(cloud_filtered, Map_resolution*2)
+    normal_small = compute_normal(cloud_filtered, Map_resolution)
 
     sumh_slope = np.full((int(Map_W/Map_resolution), int(Map_B/Map_resolution)), 0, np.float32)
     sumh_roughness = np.full((int(Map_W/Map_resolution), int(Map_B/Map_resolution)), 0, np.float32)
@@ -222,4 +230,4 @@ def compute_geometric_features(map_cloud_pcl, map_w, map_b, map_resolution):
     ###############################################
     slope_img, roughness_img = get_slope_roughness_img(cloud_filtered, point_row_col)    
 
-    return hdiff_img, slope_img, roughness_img, point_row_col
+    return hdiff_img, slope_img, roughness_img, obs_rgb, point_row_col
