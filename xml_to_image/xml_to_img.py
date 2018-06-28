@@ -27,7 +27,7 @@ def main(args):
 	# 		process_xml(xml_path)
 	# 		# cv2.destroyAllWindows()
 
-	folder_path = '/home/xi/centauro_img/stairs/'
+	folder_path = '/home/xi/workspace/bonn_features/img_jpg/'
 	file_list = os.listdir(folder_path)
 	count = 1
 	for file_name in file_list:
@@ -62,9 +62,9 @@ def process_xml(xml_path):
 	img_grey = np.zeros((width,height,1), np.uint8)
 
 	img_grey = draw_one_class(root, img_grey, 'safe', flat_label)
-	img_grey = draw_one_class(root, img_grey, 'rough', rough_label)
-	img_grey = draw_one_class(root, img_grey, 'stair', stair_label)
 	img_grey = draw_one_class(root, img_grey, 'obstacle', obstacle_label)
+	img_grey = draw_one_class(root, img_grey, 'risky', rough_label)
+	img_grey = draw_one_class(root, img_grey, 'stair', stair_label)
 
 	# cv2.imshow('img', img)
 	# cv2.moveWindow('img', 0, 0)
