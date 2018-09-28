@@ -35,21 +35,19 @@ def load_feature_file():
     test_labels = []
     
 #     test_index = np.random.choice(29, 5, replace=False)
-#     test_files = [2,3,5,10,13,24,28]
-    test_files = [10]
+    test_files = range(29)
+    # test_files = [2]
     test_index = []
     
     
     for (feature_file, rgb_file, l_file) in zip(feature_path, rgb_path, true_label_path):
         print("in load file", feature_file)
         features_map = np.load(feature_file)
-        if feature_file != '/home/xi/workspace/bonn_features/30.npy':
-            h_img_file = feature_file[0:-4]
-            h_img_file = h_img_file + '_stair.png'
-            h_feature = cv2.imread(rgb_file, 0)
-            features_map[:,:,4] = h_feature
+        h_img_file = feature_file[0:-4]
+        h_img_file = h_img_file + '_stair.png'
 
-        # features_map = features_map[:,:,1:]
+        h_feature = cv2.imread(rgb_file, 0)
+        features_map[:,:,4] = h_feature
 
         rgb_img = cv2.imread(rgb_file, 1)
         true_label_img = cv2.imread(l_file, 0)/50
@@ -179,7 +177,7 @@ rgb_path = []
 true_label_path = []
 size = 0
 
-folder_path = '/home/xi/workspace/iit_features/'
+folder_path = '/home/xi/workspace/bonn_features/'
 feature_file_list = os.listdir(folder_path)
 for file_name in feature_file_list:
     if file_name.find('.npy') != -1:
@@ -223,14 +221,17 @@ y_train = train_labels
 
 
 from sklearn.ensemble import RandomForestClassifier
-print('training...')
-clf = RandomForestClassifier(max_depth=30, n_estimators=10, max_features=1, class_weight='balanced')
-clf.fit(X_train, y_train)
+# print('training...')
+# clf = RandomForestClassifier(max_depth=30, n_estimators=10, max_features=1)
+# clf.fit(X_train, y_train)
 
-pickle.dump(clf, open("/home/xi/workspace/terrain_classifier/tc_model.pickle","wb"), protocol=2)
-pickle.dump(scaler, open("/home/xi/workspace/terrain_classifier/tc_model_scaler.pickle","wb"), protocol=2)
+# pickle.dump(clf, open("/home/xi/workspace/terrain_classifier/tc_model.pickle","wb"), protocol=2)
+# pickle.dump(scaler, open("/home/xi/workspace/terrain_classifier/tc_model_scaler.pickle","wb"), protocol=2)
 
-print("done!!")
+# print("done!!")
+
+clf = pickle.load(open('/home/xi/workspace/terrain_classifier/tc_model.pickle', 'rb'))
+scaler = pickle.load(open('/home/xi/workspace/terrain_classifier/tc_model_scaler.pickle', 'rb'))
 
 sum_score = 0
 for i in range(len(test_index)):
@@ -263,15 +264,16 @@ for i in range(len(test_index)):
     cv2.imwrite(file_base +'_pred.png', pred_img)
     cv2.imwrite(file_base +'_stair.png', h_stair)
     
-    f = plt.figure()
-    f.add_subplot(1,3, 1)
-    plt.imshow(rgb_img)
-    f.add_subplot(1,3, 2)
-    plt.imshow(h_stair)   
-    f.add_subplot(1,3, 3)
-    plt.imshow(pred_img)      
-    plt.show()  
+    # f = plt.figure()
+    # f.add_subplot(1,3, 1)
+    # plt.imshow(rgb_img)
+    # f.add_subplot(1,3, 2)
+    # plt.imshow(h_stair)   
+    # f.add_subplot(1,3, 3)
+    # plt.imshow(pred_img)      
+    # plt.show()  
     
+print('done')
 print (sum_score/len(test_index))
     
     
